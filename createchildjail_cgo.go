@@ -1,6 +1,7 @@
 // +build cgo
 
 package gojail
+
 /*
 #include <unistd.h>
 #include <stdlib.h>
@@ -46,24 +47,24 @@ import (
 )
 
 func (j *jail) CreateChildJail(parameters map[string]interface{}) (Jail, error) {
-        name, err := jailParametersGetName(parameters)
-        if err != nil {
-                return nil, err
-        }
+	name, err := jailParametersGetName(parameters)
+	if err != nil {
+		return nil, err
+	}
 
-        iovecs, err := jailParseParam(parameters)
-        if err != nil {
-                return nil, err
-        }
+	iovecs, err := jailParseParam(parameters)
+	if err != nil {
+		return nil, err
+	}
 
 	reader, writer, err := os.Pipe()
 	if err != nil {
 		return nil, err
 	}
 
-        errbuf, erriov := makeErrorIov()
+	errbuf, erriov := makeErrorIov()
 
-        iovecs = append(iovecs, erriov...)
+	iovecs = append(iovecs, erriov...)
 	iov := (*C.struct_iovec)(unsafe.Pointer(&iovecs[0]))
 	result := C.create_jail_in_child(C.int(j.jailID), C.int(writer.Fd()), (*C.char)(unsafe.Pointer(&errbuf[0])), iov, C.uint(len(iovecs)))
 	if result != 0 {
@@ -74,8 +75,7 @@ func (j *jail) CreateChildJail(parameters map[string]interface{}) (Jail, error) 
 	reader.Read(jidbuf)
 	jid := (*int32)(unsafe.Pointer(&jidbuf[0]))
 	return &jail{
-		jailID: int(*jid),
+		jailID:   int(*jid),
 		jailName: name,
 	}, nil
 }
-

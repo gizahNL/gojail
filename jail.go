@@ -32,7 +32,7 @@ type Jail interface {
 	Name() string
 	//ID returns the jail ID
 	ID() int
-	//Attach attaches the current running process to the jail
+	//Attach attaches the current running process to the jailq
 	Attach() error
 	//RunIn runs a command inside the jail
 	RunIn() error
@@ -141,37 +141,6 @@ func jailSet(iovecs []syscall.Iovec, flags int) (int, error) {
 	return jailIOVSyscall(syscall.SYS_JAIL_SET, iovecs, flags)
 }
 
-//JailGetByName queries the OS for Jail with name jailName
-func JailGetByName(jailName string) (Jail, error) {
-	JailName := []byte(jailName + "\000")
-	iov := makeJailIovec(iovName, &JailName[0], len(JailName))
-
-	jid, err := jailGet(iov, 0)
-	if err != nil {
-		return nil, err
-	}
-	return &jail{
-		jailID:   jid,
-		jailName: jailName,
-	}, nil
-}
-
-//JailGetByID queries the OS for Jail with jid jailID
-func JailGetByID(jailID int) (Jail, error) {
-	namebuf := make([]byte, maxhostnamelen)
-	jid := int32(jailID)
-	iovecs := makeJailIovec(iovJid, (*byte)(unsafe.Pointer(&jid)), 4)
-	iovecs = append(iovecs, makeJailIovec(iovName, &namebuf[0], len(namebuf))...)
-	_, err := jailGet(iovecs, 0)
-	if err != nil {
-		return nil, err
-	}
-	return &jail{
-		jailID:   jailID,
-		jailName: string(namebuf),
-	}, nil
-}
-
 func jailParseParam(parameters map[string]interface{}) ([]syscall.Iovec, error) {
 	iovecs := make([]syscall.Iovec, 0)
 	for key, value := range parameters {
@@ -179,20 +148,20 @@ func jailParseParam(parameters map[string]interface{}) ([]syscall.Iovec, error) 
 		if err != nil {
 			return nil, err
 		}
-		iovecs = append(iovecs, parIovec ...)
+		iovecs = append(iovecs, parIovec...)
 	}
 	return iovecs, nil
 }
 
 func jailParametersGetName(parameters map[string]interface{}) (string, error) {
-        //not truly mandatory
-        if _, ok := parameters["name"]; !ok {
-                return "", errors.New("Name param mandatory for jail creation")
-        }
-        name, ok := parameters["name"].(string)
-        if !ok {
-                return "", errors.New("Name param must be a string")
-        }
+	//not truly mandatory
+	if _, ok := parameters["name"]; !ok {
+		return "", errors.New("Name param mandatory for jail creation")
+	}
+	name, ok := parameters["name"].(string)
+	if !ok {
+		return "", errors.New("Name param must be a string")
+	}
 	return name, nil
 }
 
@@ -215,13 +184,6 @@ func jailCreate(parameters map[string]interface{}) (*jail, error) {
 		jailID:   jailID,
 		jailName: name,
 	}, nil
-}
-
-//JailCreate creates a Jail with the given parameters, no validation is done atm
-//accepted types for interface{}: int32/*int32/uint32/*uint32/string/bool/[]byte
-//byte slices MUST be null terminated if the OS expects a string var.
-func JailCreate(jailParameters map[string]interface{}) (Jail, error) {
-	return jailCreate(jailParameters)
 }
 
 func (j *jail) Name() string {
