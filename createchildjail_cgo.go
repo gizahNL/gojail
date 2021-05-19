@@ -52,7 +52,7 @@ func (j *jail) CreateChildJail(parameters map[string]interface{}) (Jail, error) 
 		return nil, err
 	}
 
-	iovecs, err := jailParseParam(parameters)
+	iovecs, err := JailParseParametersToIovec(parameters)
 	if err != nil {
 		return nil, err
 	}
@@ -73,9 +73,9 @@ func (j *jail) CreateChildJail(parameters map[string]interface{}) (Jail, error) 
 	}
 	jidbuf := make([]byte, 4)
 	reader.Read(jidbuf)
-	jid := (*int32)(unsafe.Pointer(&jidbuf[0]))
+	jid := (*JailID)(unsafe.Pointer(&jidbuf[0]))
 	return &jail{
-		jailID:   int(*jid),
+		jailID:   *jid,
 		jailName: name,
 	}, nil
 }
