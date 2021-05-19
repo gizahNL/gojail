@@ -57,6 +57,11 @@ func (j *jail) CreateChildJail(parameters map[string]interface{}) (Jail, error) 
 		return nil, err
 	}
 
+	err = checkAndIncreaseChildMax(j.jailID)
+	if err != nil {
+		return nil, err
+	}
+
 	reader, writer, err := os.Pipe()
 	if err != nil {
 		return nil, err
@@ -78,4 +83,36 @@ func (j *jail) CreateChildJail(parameters map[string]interface{}) (Jail, error) 
 		jailID:   *jid,
 		jailName: name,
 	}, nil
+}
+
+func checkAndIncreaseChildMax(jid JailID) error {
+	var childrenMax, childrenCur int32
+	getparam := make(map[string]interface{})
+	getparam["jid"] = jid
+	getparam["children.max"] = &childrenMax
+	getparam["children.cur"] = &childrenCur
+
+	getIovecs, err := JailParseParametersToIovec(getparam)
+	if err != nil {
+		return err
+	}
+
+	_, err = JailGet(getIovecs, 0)
+	if err != nil {
+		return err
+	}
+
+	if childrenCur >= childrenMax {
+		setparam := make(map[string]interface{})
+		setparam["jid"] = jid
+		setparam["children.max"] = childrenMax + 1
+
+		setIovecs, err := JailParseParametersToIovec(setparam)
+		if err != nil {
+			return err
+		}
+		_, err = JailSet(setIovecs, JailFlagUpdate)
+		return err
+	}
+	return nil
 }
