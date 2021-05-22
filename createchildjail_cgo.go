@@ -30,6 +30,7 @@ int create_jail_in_child(int parent, int pipefd, char* errbuf, struct iovec *iov
 		_exit(EXIT_SUCCESS);
 	} else if (pid > 0) {
 		pid = waitpid(pid, &res, 0);
+		close(pipefd);
 		if (WIFEXITED(res)) {
 			return WEXITSTATUS(res);
 		}
@@ -41,10 +42,50 @@ int create_jail_in_child(int parent, int pipefd, char* errbuf, struct iovec *iov
 import "C"
 
 import (
-	"errors"
 	"os"
 	"unsafe"
+	"syscall"
 )
+
+//go:norace
+func testCreateInChild(parentID, iovecs, niovecs uintptr, pipe int) (pid int, err syscall.Errno) {
+	var (
+		r1 uintptr
+		jid int32
+		err1 syscall.Errno
+	)
+
+	r1, _, err1 = syscall.RawSyscall(syscall.SYS_FORK, 0, 0, 0)
+	if err1 != 0 {
+		return 0, err1
+	}
+
+	if r1 != 0 {
+		return int(r1), 0
+	}
+
+	r1, _, err1 = syscall.RawSyscall(syscall.SYS_JAIL_ATTACH, uintptr(parentID), 0, 0)
+	if err1 != 0 {
+		goto childerror
+	}
+
+	r1, _, err1 = syscall.RawSyscall(syscall.SYS_JAIL_SET, iovecs, niovecs, JailFlagCreate)
+	if err1 != 0 || int(r1) == -1 {
+		goto childerror
+	}
+	jid = int32(r1)
+	syscall.RawSyscall(syscall.SYS_WRITE, uintptr(pipe), uintptr(unsafe.Pointer(&jid)), unsafe.Sizeof(jid))
+	for {
+		syscall.RawSyscall(syscall.SYS_EXIT, 0, 0, 0)
+	}
+
+
+childerror:
+	syscall.RawSyscall(syscall.SYS_WRITE, uintptr(pipe), uintptr(unsafe.Pointer(&err1)), unsafe.Sizeof(err1))
+	for {
+		syscall.RawSyscall(syscall.SYS_EXIT, 253, 0, 0)
+	}
+}
 
 func (j *jail) CreateChildJail(parameters map[string]interface{}) (Jail, error) {
 	name, err := jailParametersGetName(parameters)
@@ -67,14 +108,26 @@ func (j *jail) CreateChildJail(parameters map[string]interface{}) (Jail, error) 
 		return nil, err
 	}
 
-	errbuf, erriov := makeErrorIov()
+	_, erriov := makeErrorIov()
 
 	iovecs = append(iovecs, erriov...)
-	iov := (*C.struct_iovec)(unsafe.Pointer(&iovecs[0]))
-	result := C.create_jail_in_child(C.int(j.jailID), C.int(writer.Fd()), (*C.char)(unsafe.Pointer(&errbuf[0])), iov, C.uint(len(iovecs)))
-	if result != 0 {
-		reader.Read(errbuf)
-		return nil, errors.New(string(errbuf))
+	syscall.ForkLock.Lock()
+	pid, err := testCreateInChild(uintptr(j.jailID), uintptr(unsafe.Pointer(&iovecs[0])), uintptr(len(iovecs)), int(writer.Fd()))
+	syscall.ForkLock.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	var waitStatus syscall.WaitStatus
+	_, err = syscall.Wait4(pid, &waitStatus, 0, nil)
+	if err != nil {
+		return nil, err
+	}
+	if waitStatus.ExitStatus() != 0 {
+		errnobuf := make([]byte, 4)
+		reader.Read(errnobuf)
+		errno := (*syscall.Errno)(unsafe.Pointer(&errnobuf[0]))
+		return nil, error(errno)
+
 	}
 	jidbuf := make([]byte, 4)
 	reader.Read(jidbuf)
