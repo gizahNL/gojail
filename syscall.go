@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 	"unsafe"
+	"golang.org/x/sys/unix"
 )
 
 //JailID is used to identify jails
@@ -70,7 +71,7 @@ func JailGetName(jid JailID) (string, error) {
 		return "", err
 	}
 
-	return string(namebuf), nil
+	return unix.ByteSliceToString(namebuf), nil
 }
 
 //JailGetID gets the JailID of jail with the given name
@@ -78,7 +79,7 @@ func JailGetID(name string) (JailID, error) {
 	getparams := make(map[string]interface{})
 
 	jid, err := strconv.Atoi(name)
-	if err != nil {
+	if err == nil {
 		if jid == 0 {
 			return JailID(0), nil
 		}
@@ -126,7 +127,7 @@ func jailIOVSyscall(callnum uintptr, iovecs []syscall.Iovec, flags int) (JailID,
 		if errbuf[0] == 0 {
 			return JailID(jid), errno
 		}
-		return JailID(jid), errors.New(string(errbuf))
+		return JailID(jid), errors.New(unix.ByteSliceToString(errbuf))
 	}
 	return JailID(jid), nil
 }
