@@ -3,13 +3,13 @@ package gojail
 import (
 	"errors"
 	"fmt"
+	"golang.org/x/sys/unix"
 	"net"
 	"reflect"
 	"strconv"
 	"strings"
 	"syscall"
 	"unsafe"
-	"golang.org/x/sys/unix"
 )
 
 //JailID is used to identify jails

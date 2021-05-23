@@ -1,18 +1,18 @@
 package gojail
 
 import (
-	"os"
-	"unsafe"
-	"syscall"
 	"errors"
-        "golang.org/x/sys/unix"
+	"golang.org/x/sys/unix"
+	"os"
+	"syscall"
+	"unsafe"
 )
 
 //go:norace
 func forkAndCreateChildJail(parentID, iovecs, niovecs, errbufptr uintptr, pipe int) (pid int, err syscall.Errno) {
 	var (
-		r1 uintptr
-		jid int32
+		r1   uintptr
+		jid  int32
 		err1 syscall.Errno
 	)
 
@@ -88,7 +88,7 @@ func (j *jail) CreateChildJail(parameters map[string]interface{}) (Jail, error) 
 		errnobuf := make([]byte, 4)
 		reader.Read(errnobuf)
 		errno := (*syscall.Errno)(unsafe.Pointer(&errnobuf[0]))
-		n, _:= reader.Read(errbuf)
+		n, _ := reader.Read(errbuf)
 		if n > 0 {
 			return nil, errors.New(unix.ByteSliceToString(errbuf))
 		}
