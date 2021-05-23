@@ -207,7 +207,9 @@ func paramToIOVec(key string, value interface{}) ([]syscall.Iovec, error) {
 		}
 
 	case bool:
-		if !v && !strings.HasPrefix(key, "no") {
+		if strings.Contains(key, ".") {
+			//nothing for now, workaround booleans like ip4.saddrsel/ip4.nosaddrsel
+		} else if !v && !strings.HasPrefix(key, "no") {
 			tmp, err := syscall.ByteSliceFromString("no" + key)
 			if err != nil {
 				return nil, err
