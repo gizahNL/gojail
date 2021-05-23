@@ -4,11 +4,12 @@ import (
 	"os"
 	"unsafe"
 	"syscall"
-	"fmt"
+	"errors"
+        "golang.org/x/sys/unix"
 )
 
 //go:norace
-func forkAndCreateChildJail(parentID, iovecs, niovecs uintptr, pipe int) (pid int, err syscall.Errno) {
+func forkAndCreateChildJail(parentID, iovecs, niovecs, errbufptr uintptr, pipe int) (pid int, err syscall.Errno) {
 	var (
 		r1 uintptr
 		jid int32
@@ -31,7 +32,7 @@ func forkAndCreateChildJail(parentID, iovecs, niovecs uintptr, pipe int) (pid in
 
 	r1, _, err1 = syscall.RawSyscall(syscall.SYS_JAIL_SET, iovecs, niovecs, JailFlagCreate)
 	if err1 != 0 || int(r1) == -1 {
-		goto childerror
+		goto errormsg
 	}
 	jid = int32(r1)
 	syscall.RawSyscall(syscall.SYS_WRITE, uintptr(pipe), uintptr(unsafe.Pointer(&jid)), unsafe.Sizeof(jid))
@@ -39,9 +40,10 @@ func forkAndCreateChildJail(parentID, iovecs, niovecs uintptr, pipe int) (pid in
 		syscall.RawSyscall(syscall.SYS_EXIT, 0, 0, 0)
 	}
 
-
-childerror:
+errormsg:
 	syscall.RawSyscall(syscall.SYS_WRITE, uintptr(pipe), uintptr(unsafe.Pointer(&err1)), unsafe.Sizeof(err1))
+childerror:
+	syscall.RawSyscall(syscall.SYS_WRITE, uintptr(pipe), uintptr(errbufptr), errormsglen)
 	for {
 		syscall.RawSyscall(syscall.SYS_EXIT, 253, 0, 0)
 	}
@@ -68,11 +70,11 @@ func (j *jail) CreateChildJail(parameters map[string]interface{}) (Jail, error) 
 		return nil, err
 	}
 
-	_, erriov := makeErrorIov()
+	errbuf, erriov := makeErrorIov()
 
 	iovecs = append(iovecs, erriov...)
 	syscall.ForkLock.Lock()
-	pid, errno := forkAndCreateChildJail(uintptr(j.jailID), uintptr(unsafe.Pointer(&iovecs[0])), uintptr(len(iovecs)), int(writer.Fd()))
+	pid, errno := forkAndCreateChildJail(uintptr(j.jailID), uintptr(unsafe.Pointer(&iovecs[0])), uintptr(len(iovecs)), uintptr(unsafe.Pointer(&errbuf[0])), int(writer.Fd()))
 	syscall.ForkLock.Unlock()
 	if errno != 0 {
 		return nil, err
@@ -86,6 +88,10 @@ func (j *jail) CreateChildJail(parameters map[string]interface{}) (Jail, error) 
 		errnobuf := make([]byte, 4)
 		reader.Read(errnobuf)
 		errno := (*syscall.Errno)(unsafe.Pointer(&errnobuf[0]))
+		n, _:= reader.Read(errbuf)
+		if n > 0 {
+			return nil, errors.New(unix.ByteSliceToString(errbuf))
+		}
 		return nil, error(errno)
 
 	}
