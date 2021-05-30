@@ -2,18 +2,20 @@ package gojail
 
 import (
 	"errors"
-	"golang.org/x/sys/unix"
 	"os"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 //go:norace
 func forkAndCreateChildJail(parentID, iovecs, niovecs, errbufptr uintptr, pipe int) (pid int, err syscall.Errno) {
 	var (
-		r1   uintptr
-		jid  int32
-		err1 syscall.Errno
+		r1      uintptr
+		jid     int32
+		err1    syscall.Errno
+		sendmsg = false
 	)
 
 	r1, _, err1 = syscall.RawSyscall(syscall.SYS_FORK, 0, 0, 0)
@@ -32,7 +34,8 @@ func forkAndCreateChildJail(parentID, iovecs, niovecs, errbufptr uintptr, pipe i
 
 	r1, _, err1 = syscall.RawSyscall(syscall.SYS_JAIL_SET, iovecs, niovecs, JailFlagCreate)
 	if err1 != 0 || int(r1) == -1 {
-		goto errormsg
+		sendmsg = true
+		goto childerror
 	}
 	jid = int32(r1)
 	syscall.RawSyscall(syscall.SYS_WRITE, uintptr(pipe), uintptr(unsafe.Pointer(&jid)), unsafe.Sizeof(jid))
@@ -40,10 +43,11 @@ func forkAndCreateChildJail(parentID, iovecs, niovecs, errbufptr uintptr, pipe i
 		syscall.RawSyscall(syscall.SYS_EXIT, 0, 0, 0)
 	}
 
-errormsg:
-	syscall.RawSyscall(syscall.SYS_WRITE, uintptr(pipe), uintptr(unsafe.Pointer(&err1)), unsafe.Sizeof(err1))
 childerror:
 	syscall.RawSyscall(syscall.SYS_WRITE, uintptr(pipe), uintptr(errbufptr), errormsglen)
+	if sendmsg {
+		syscall.RawSyscall(syscall.SYS_WRITE, uintptr(pipe), uintptr(unsafe.Pointer(&err1)), unsafe.Sizeof(err1))
+	}
 	for {
 		syscall.RawSyscall(syscall.SYS_EXIT, 253, 0, 0)
 	}
