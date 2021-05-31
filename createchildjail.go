@@ -44,9 +44,9 @@ func forkAndCreateChildJail(parentID, iovecs, niovecs, errbufptr uintptr, pipe i
 	}
 
 childerror:
-	syscall.RawSyscall(syscall.SYS_WRITE, uintptr(pipe), uintptr(errbufptr), errormsglen)
+	syscall.RawSyscall(syscall.SYS_WRITE, uintptr(pipe), uintptr(unsafe.Pointer(&err1)), unsafe.Sizeof(err1))
 	if sendmsg {
-		syscall.RawSyscall(syscall.SYS_WRITE, uintptr(pipe), uintptr(unsafe.Pointer(&err1)), unsafe.Sizeof(err1))
+	    syscall.RawSyscall(syscall.SYS_WRITE, uintptr(pipe), uintptr(errbufptr), errormsglen)
 	}
 	for {
 		syscall.RawSyscall(syscall.SYS_EXIT, 253, 0, 0)
