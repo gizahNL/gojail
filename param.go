@@ -69,14 +69,11 @@ func paramToIOVec(key string, value interface{}) ([]syscall.Iovec, error) {
 		//in normal config, but actually map to 0, 1 ,2
 		switch v {
 		case "disabled":
-			tmp := int32(0)
-			val = (*byte)(unsafe.Pointer(&tmp))
+			return paramToIOVec(key, int32(0))
 		case "new":
-			tmp := int32(1)
-			val = (*byte)(unsafe.Pointer(&tmp))
+			return paramToIOVec(key, int32(1))
 		case "inherit":
-			tmp := int32(2)
-			val = (*byte)(unsafe.Pointer(&tmp))
+			return paramToIOVec(key, int32(2))
 		default:
 			val, err = syscall.BytePtrFromString(v)
 			if err != nil {
