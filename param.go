@@ -88,28 +88,30 @@ func paramToIOVec(key string, value interface{}) ([]syscall.Iovec, error) {
 		val = &v[0]
 		valsize = len(v)
 	case []net.IP:
-		//This bit is all untested, use net.IP addresses at your own risk.
-		state := 0 //0 -> not initialized, 1 -> ipv4, 2 -> ipv6
-		tmp := make([]byte, 0)
-		for _, ip := range v {
-			ipv4 := ip.To4()
-			if ipv4 == nil {
-				if state == 1 {
-					return nil, errors.New("Mixing ipv4 & ipv6 not allowed")
+		//This bit is untested still, use at your own risk
+		ipBytes := make([]byte, 0)
+		if strings.Contains(key, "ipv4") {
+			for _, ip := range v {
+				ipv4 := ip.To4()
+				if ipv4 != nil {
+					ipBytes = append(ipBytes, []byte(ipv4)...)
+				} else {
+					return nil, fmt.Errorf("could not parse %s to ipv4 address", ip.String())
 				}
-				state = 2
-				tmp = append(tmp, []byte(ip)...)
-			} else {
-				if state == 2 {
-					return nil, errors.New("Mixing ipv4 & ipv6 not allowed")
-				}
-				state = 1
-				tmp = append(tmp, ipv4...)
 			}
-			val = &tmp[0]
-			valsize = len(tmp)
+		} else if strings.Contains(key, "ipv6") {
+			for _, ip := range v {
+				if ipv4 := ip.To4(); ipv4 == nil {
+					ipBytes = append(ipBytes, []byte(ip)...)
+				} else {
+					return nil, fmt.Errorf("expected ipv6 address got %s", ip.String())
+				}
+			}
+		} else {
+			return nil, fmt.Errorf("parsing of net.IP not implemented for key: %s", key)
 		}
-
+		val = &ipBytes[0]
+		valsize = len(ipBytes)
 	case bool:
 		//work around for vnet, which is used like a bool, but from testing seems to need
 		//an int32 value of 1 when enabling
