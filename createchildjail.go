@@ -92,9 +92,10 @@ func (j *jail) CreateChildJail(parameters map[string]interface{}) (Jail, error) 
 		errnobuf := make([]byte, 4)
 		reader.Read(errnobuf)
 		errno := (*syscall.Errno)(unsafe.Pointer(&errnobuf[0]))
-		n, _ := reader.Read(errbuf)
-		if n > 0 {
-			return nil, errors.New(unix.ByteSliceToString(errbuf))
+		reader.Read(errbuf)
+		errstring := unix.ByteSliceToString(errbuf)
+		if errstring != "" {
+			return nil, errors.New(errstring)
 		}
 		return nil, error(errno)
 
