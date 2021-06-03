@@ -39,7 +39,7 @@ func splitParamInPrefixAndParam(p string) (prefix string, param string) {
 	s := strings.Split(p, ".")
 	param = s[len(s)-1]
 	s = s[:len(s)-1]
-	prefix = strings.Join(s, ".")
+	prefix = strings.Join(s, ".") + "."
 	return prefix, param
 }
 
