@@ -19,6 +19,8 @@ type Jail interface {
 	Destroy() error
 	//CreateChildJail creates a Jail as a child in the current jail, incrementing max children as needed
 	CreateChildJail(map[string]interface{}) (Jail, error)
+	//Set jail parameters
+	Set(map[string]interface{}) error
 }
 
 type jail struct {
@@ -44,4 +46,14 @@ func (j *jail) Destroy() error {
 
 func (j *jail) RunIn() error {
 	return errors.New("Not implemented")
+}
+
+func (j *jail) Set(params map[string]interface{}) error {
+	params["jid"] = j.ID()
+	iov, err := JailParseParametersToIovec(params)
+	if err != nil {
+		return err
+	}
+	_, err = JailSet(iov, JailFlagUpdate)
+	return err
 }
