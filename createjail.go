@@ -6,7 +6,14 @@ import "errors"
 //accepted types for interface{}: int32/*int32/uint32/*uint32/string/bool/[]byte
 //byte slices MUST be null terminated if the OS expects a string var.
 func JailCreate(jailParameters map[string]interface{}) (Jail, error) {
-	return jailCreate(jailParameters)
+	return jailCreate(jailParameters, JailFlagCreate)
+}
+
+//Similar to JailCreate but also attaches to the new jail. This can be used to
+//create short-lived nopersist jails to simplify cleanup after the jailed
+//process exits
+func JailCreateAndAttach(jailParameters map[string]interface{}) (Jail, error) {
+	return jailCreate(jailParameters, JailFlagCreate|JailFlagAttach)
 }
 
 func jailParametersGetName(parameters map[string]interface{}) (string, error) {
@@ -21,7 +28,7 @@ func jailParametersGetName(parameters map[string]interface{}) (string, error) {
 	return name, nil
 }
 
-func jailCreate(parameters map[string]interface{}) (*jail, error) {
+func jailCreate(parameters map[string]interface{}, flag int) (*jail, error) {
 	name, err := jailParametersGetName(parameters)
 	if err != nil {
 		return nil, err
@@ -32,7 +39,7 @@ func jailCreate(parameters map[string]interface{}) (*jail, error) {
 		return nil, err
 	}
 
-	jailID, err := JailSet(iovecs, JailFlagCreate)
+	jailID, err := JailSet(iovecs, flag)
 	if err != nil {
 		return nil, err
 	}
